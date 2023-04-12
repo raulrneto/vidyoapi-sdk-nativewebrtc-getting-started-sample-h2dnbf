@@ -28,10 +28,11 @@
             <div id="startTooltip" class="tooltip">
               Click here to generate a meeting link and join the call
             </div>
+            <!-- chama funcao para iniciar o chat e o vidyo  PostVidyoToAgent() -->
             <button
               id="btnStart"
               title="Start call"
-              onclick="joinCall()"
+              onclick="PostVidyoToAgent()"
               class="btnstart"
             ></button>
           </div>
@@ -73,6 +74,7 @@
           </button>
         </div>
       </div>
+      <!-- Div do chat -->
       <div id="webchat" role="main"></div>
     </main>
 
@@ -81,7 +83,7 @@
       src="https://static.platform.vidyo.io/vidyoclient/webrtc/latest/VidyoClient.js"
       onload="onVidyoClientLoaded()"
     ></script>
-
+    //codigo do chat
     <script src="https://cdn.botframework.com/botframework-webchat/4.7.1/webchat-es5.js"></script>
     <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
     <script>
@@ -512,6 +514,8 @@
               if (params['disableOnEnd'] === 'true') {
                 disableWebChat();
                 directLine.end();
+                // disconecta o video caso o agente sai da reunião.
+                handleDisconnect();
               }
             }
           });
@@ -519,16 +523,8 @@
         renderWebChat();
       });
 
-      function PostVidyoToAgent() {
+      async function PostVidyoToAgent() {
         console.debug('DEBUG-RAUL - vidyo');
-        console.log('email = ', document.getElementById('email100').value);
-        if (document.getElementById('email100').value != 'undefined') {
-          var uri =
-            'https://smartlivedemo.altitude.com/VidyoConnector/VidyoConnector.html?autoJoin=1&chatType=0&connectorType=browser&displayName=' +
-            document.getElementById('email100').value +
-            '&hideConfig=0&portal=enghousedev.platform.vidyo.io&roomKey=9OWQ8YGeEA&roomPin=1357911&userType=2';
-          document.getElementById('fvidyo').src = uri;
-        }
         directLine
           .postActivity({
             type: 'message',
@@ -548,6 +544,7 @@
           .subscribe(function (id) {
             console.log('vidyo id = ', id);
           });
+        await joinCall();
       }
     </script>
   </body>
