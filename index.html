@@ -534,6 +534,15 @@
         console.debug('DEBUG-RAUL - vidyo');
         directLine
           .postActivity({
+            type: 'message',
+            text: 'Enghouse Altitude Chat & Vidyo',
+            from: user,
+          })
+          .subscribe(function (id) {
+            console.log('empty activity: id = ', id);
+          });
+        directLine
+          .postActivity({
             type: 'event',
             name: 'OpenVidyo',
             from: user,
