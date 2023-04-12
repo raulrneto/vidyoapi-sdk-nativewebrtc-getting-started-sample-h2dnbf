@@ -1,50 +1,554 @@
 <!DOCTYPE html>
 <html>
-<head>
-	<meta charset="utf-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<title>Vidyo WebRTC demo</title>
-	<link rel="stylesheet" href="main.css">
-	<link rel="stylesheet" href="https://static.platform.vidyo.io/vidyoclient/webrtc/latest/VidyoClient.css">
-</head>
-<body>
-	<main>
-		<div class="side-panel">
-			<img class="logo" src="./assets/vidyoPlatformLogo.png">
-			<label for="name">Display name:</label>
-			<input type="text" id="name" value="User1" size="20" placeholder="Display name" required>
-			<div class="controls">
-				<div>
-					<div id="startTooltip" class="tooltip">Click here to generate a meeting link and join the call</div>
-					<button id="btnStart" title="Start call" onclick="joinCall()" class="btnstart"></button>
-				</div>
-				<button id="btnEnd" title="End call" onclick="endCall()" class="btnend"></button>
-			</div>
-		</div>
-		<div class="renderer-container">
-			<div class="meeting-link">
-				<span>Room info:</span>
-				<img src="./assets/call_info.svg" title="Room info" onclick="roomInfoClick()">
-				<span>Meeting link:</span>
-				<img src="./assets/copy_white.svg" title="Copy to clipboard" onclick="copyToClipboard()">
-				<span id="meetingLink"></span>
-			</div>
-			<div id="renderer"></div>
-		</div>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Vidyo WebRTC demo</title>
+    <link rel="stylesheet" href="main.css" />
+    <link
+      rel="stylesheet"
+      href="https://static.platform.vidyo.io/vidyoclient/webrtc/latest/VidyoClient.css"
+    />
+  </head>
+  <body>
+    <main>
+      <div class="side-panel">
+        <img class="logo" src="./assets/vidyoPlatformLogo.png" />
+        <label for="name">Display name:</label>
+        <input
+          type="text"
+          id="name"
+          value="User1"
+          size="20"
+          placeholder="Display name"
+          required
+        />
+        <div class="controls">
+          <div>
+            <div id="startTooltip" class="tooltip">
+              Click here to generate a meeting link and join the call
+            </div>
+            <button
+              id="btnStart"
+              title="Start call"
+              onclick="joinCall()"
+              class="btnstart"
+            ></button>
+          </div>
+          <button
+            id="btnEnd"
+            title="End call"
+            onclick="endCall()"
+            class="btnend"
+          ></button>
+        </div>
+      </div>
+      <div class="renderer-container">
+        <div class="meeting-link">
+          <span>Room info:</span>
+          <img
+            src="./assets/call_info.svg"
+            title="Room info"
+            onclick="roomInfoClick()"
+          />
+          <span>Meeting link:</span>
+          <img
+            src="./assets/copy_white.svg"
+            title="Copy to clipboard"
+            onclick="copyToClipboard()"
+          />
+          <span id="meetingLink"></span>
+        </div>
+        <div id="renderer"></div>
+      </div>
 
-		<div id="loadingPopUp" class="loading-popup" data-text="">
-			<div class="loader"></div>
-		</div>
-		<div id="roomInfoPopUp" class="room-info-popup-container">
-			<div class="room-info-popup">
-				<pre class="room-info-text"></pre>
-				<button type="button" class="room-info-popup-close-btn">
-					<span>Close</span>
-				</button>
-			</div>
-		</div>
-	</main>
-	<script src="main.js"></script>
-	<script src="https://static.platform.vidyo.io/vidyoclient/webrtc/latest/VidyoClient.js" onload='onVidyoClientLoaded()'></script>
-</body>
+      <div id="loadingPopUp" class="loading-popup" data-text="">
+        <div class="loader"></div>
+      </div>
+      <div id="roomInfoPopUp" class="room-info-popup-container">
+        <div class="room-info-popup">
+          <pre class="room-info-text"></pre>
+          <button type="button" class="room-info-popup-close-btn">
+            <span>Close</span>
+          </button>
+        </div>
+      </div>
+      <div id="webchat" role="main"></div>
+    </main>
+
+    <script src="main.js"></script>
+    <script
+      src="https://static.platform.vidyo.io/vidyoclient/webrtc/latest/VidyoClient.js"
+      onload="onVidyoClientLoaded()"
+    ></script>
+
+    <script src="https://cdn.botframework.com/botframework-webchat/4.7.1/webchat-es5.js"></script>
+    <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+    <script>
+      function queryParams(locationSearch) {
+        let params = {};
+        let sPageURL = locationSearch.substring(1),
+          sURLVariables = sPageURL.split('&'),
+          sParameterName,
+          i;
+        for (i = 0; i < sURLVariables.length; i++) {
+          sParameterName = sURLVariables[i].split('=');
+          params[sParameterName[0]] =
+            sParameterName[1] === undefined
+              ? true
+              : decodeURIComponent(sParameterName[1]);
+        }
+        return params;
+      }
+
+      const params = queryParams(window.location.search);
+
+      window['botchatDebug'] = params['debug'] === 'true';
+
+      function generateUserId() {
+        let cryptoObj = window.crypto || window.msCrypto || {};
+        if (typeof cryptoObj.getRandomValues === 'function') {
+          let array = new Uint32Array(1);
+          cryptoObj.getRandomValues(array);
+          return array[0].toString(36);
+        } else {
+          return Math.random().toString(36).substring(2);
+        }
+      }
+
+      function getTokensUri(entryPoint) {
+        let tokensUri = location.pathname;
+        for (idx = 0; idx < 2; idx++) {
+          tokensUri = tokensUri.substring(0, tokensUri.lastIndexOf('/'));
+        }
+        tokensUri =
+          location.origin + tokensUri + '/api/tokens?entryPoint=' + entryPoint;
+        return tokensUri;
+      }
+
+      const ConnectionStatus = {
+        Uninitialized: 0,
+        Connecting: 1,
+        Online: 2,
+        ExpiredToken: 3,
+        FailedToConnect: 4,
+        Ended: 5,
+      };
+
+      const channelAccountId =
+        params['channelAccountId'] || params['userid'] || undefined;
+      const channelAccountName =
+        params['channelAccountName'] || params['username'] || undefined;
+
+      const user = {
+        id: channelAccountId || generateUserId(),
+        name: channelAccountName || params['email'],
+      };
+
+      var directLine = null;
+      var conversationId = undefined;
+      var entryPoint = undefined;
+      var firstOnline = false;
+      var postActivityToAgentProcessed = false;
+
+      var styleOptions;
+      var paramsStyleOptions = undefined;
+      if (params['styleOptions'] !== undefined) {
+        paramsStyleOptions = JSON.parse(params['styleOptions']);
+        styleOptions = paramsStyleOptions;
+      } else {
+        styleOptions = { groupTimestamp: 60000 };
+      }
+
+      if (params['enableOnConnected'] === 'true') {
+        styleOptions.hideSendBox = true;
+        styleOptions.hideUploadButton = true;
+      }
+
+      var styleSet = undefined;
+      if (params['styleSet'] !== undefined) {
+        let paramsStyleSet = JSON.parse(params['styleSet']);
+        styleSet = window.WebChat.createStyleSet(styleOptions);
+        Object.keys(paramsStyleSet).forEach(function (i) {
+          if (
+            typeof paramsStyleSet[i] === 'object' &&
+            typeof styleSet[i] === 'object'
+          ) {
+            Object.keys(paramsStyleSet[i]).forEach(function (j) {
+              styleSet[i][j] = paramsStyleSet[i][j];
+            });
+          } else {
+            styleSet[i] = objStyleSet[i];
+          }
+        });
+      }
+
+      function disableWebChat() {
+        console.log('disableWebChat');
+        styleOptions.hideSendBox = true;
+        styleOptions.hideUploadButton = true;
+        renderWebChat();
+      }
+
+      function enableWebChat() {
+        console.log('enableWebChat');
+        styleOptions.hideSendBox =
+          paramsStyleOptions !== undefined
+            ? paramsStyleOptions.hideSendBox
+            : false;
+        styleOptions.hideUploadButton =
+          paramsStyleOptions !== undefined
+            ? paramsStyleOptions.hideUploadButton
+            : false;
+        renderWebChat();
+      }
+
+      function renderWebChat() {
+        console.log('renderWebChat');
+
+        let newStyleOptions = {};
+        Object.keys(styleOptions).forEach(function (k) {
+          newStyleOptions[k] = styleOptions[k];
+        });
+
+        window.WebChat.renderWebChat(
+          {
+            directLine: directLine,
+            styleOptions: newStyleOptions,
+            styleSet: styleSet,
+            userID: user.id,
+            username: user.name,
+            locale: params['locale'] || document.documentElement.lang,
+            sendTypingIndicator: params['sendTypingIndicator'] || true,
+          },
+          document.getElementById('webchat')
+        );
+
+        if (
+          newStyleOptions.hideSendBox === undefined ||
+          newStyleOptions.hideSendBox === false
+        ) {
+          $('#webchat > *').focus();
+        }
+      }
+      var webChatWorker;
+      if (
+        typeof Worker === 'function' &&
+        !!!navigator.userAgent.match(/Trident.*rv\:11\./)
+      ) {
+        webChatWorker = new Worker('webChatWorker.js');
+      } else {
+        webChatWorker = null;
+      }
+
+      $(window).on('beforeunload', function (evt) {
+        try {
+          console.log('beforeunload');
+          if (typeof directLine === 'object') {
+            if (webChatWorker != null) {
+              webChatWorker.postMessage({
+                command: 'postWebChatUnload',
+                domain: directLine.domain,
+                token: directLine.token,
+                user: user,
+                conversationId: directLine.conversationId,
+              });
+            } else {
+              let activity = {
+                type: 'event',
+                name: 'webChatUnload',
+                from: user,
+                value: {},
+              };
+              $.ajax({
+                type: 'POST',
+                url:
+                  directLine.domain +
+                  '/conversations/' +
+                  directLine.conversationId +
+                  '/activities',
+                headers: { Authorization: 'Bearer ' + directLine.token },
+                contentType: 'application/json',
+                dataType: 'json',
+                data: JSON.stringify(activity),
+                async: false,
+                error: function (e) {
+                  console.log('webChatUnload err', e);
+                },
+                success: function (data) {
+                  console.log('webChatUnload success data = ', data);
+                },
+              });
+            }
+            directLine.end();
+          }
+        } catch (err) {
+          console.log('webChatWorker error', err);
+        }
+      });
+
+      if (params['loadHistory'] === 'true') {
+        let oldConversationId = window.localStorage.getItem('conversationId');
+        if (
+          oldConversationId !== undefined &&
+          oldConversationId !== null &&
+          oldConversationId !== ''
+        ) {
+          conversationId = oldConversationId;
+          console.log(
+            'Read conversationId from localtorage conversationId=',
+            conversationId !== undefined ? conversationId : 'undefined'
+          );
+        }
+      }
+
+      if (params['c'] !== undefined) {
+        conversationId = params['c'];
+      }
+
+      params['entryPoint'] = params['entryPoint'] || params['pageId'];
+
+      var deferred = new $.Deferred();
+      deferred.resolve({
+        secret: '_wBS1029ye8.TN-HFySa9zqtVsaMaEc7jYIpXQRJLSAZNde3wNzarJ4',
+      });
+      if (params['s'] !== undefined) {
+        deferred.resolve({ secret: params['s'] });
+      } else if (params['t'] !== undefined) {
+        deferred.resolve({ token: params['t'] });
+      } else if (params['entryPoint'] !== undefined) {
+        let tokensUri = getTokensUri(params['entryPoint']);
+        $.getJSON(tokensUri)
+          .done(function (token) {
+            deferred.resolve({ token: token });
+          })
+          .fail(function () {
+            console.error('Could not get token');
+            deferred.resolve({});
+          });
+      } else {
+        console.error('unknown entryPoint');
+        deferred.resolve({});
+      }
+
+      deferred.done(function (directLineInit) {
+        if (conversationId !== undefined) {
+          console.log('Load history conversationId =', conversationId);
+          directLineInit.conversationId = conversationId;
+          directLineInit.webSocket = false;
+        } else {
+          directLineInit.webSocket =
+            params['webSocket'] && params['webSocket'] === 'true';
+        }
+        if (params['w'] !== undefined) {
+          directLineInit.watermark = params['w'];
+        }
+        directLineInit.domain = params['domain'];
+        directLine = window.WebChat.createDirectLine(directLineInit);
+
+        directLine.connectionStatus$.subscribe(function (connectionStatus) {
+          console.log(
+            'connectionStatus=',
+            Object.keys(ConnectionStatus).find(function (key) {
+              return ConnectionStatus[key] === connectionStatus;
+            })
+          );
+          switch (connectionStatus) {
+            case ConnectionStatus.Online:
+              console.log(
+                'directLine.conversationId=',
+                directLine.conversationId
+              );
+
+              if (!firstOnline) {
+                firstOnline = true;
+
+                if (
+                  (params['loadHistory'] === 'true' &&
+                    conversationId === undefined) ||
+                  params['resetHistory'] === 'true'
+                ) {
+                  console.log(
+                    'Write conversationId to localStorage',
+                    directLine.conversationId
+                  );
+                  window.localStorage.setItem(
+                    'conversationId',
+                    directLine.conversationId
+                  );
+                }
+
+                if (params['initialActivity'] !== undefined) {
+                  let activity = JSON.parse(params['initialActivity']);
+                  activity.from = user;
+                  directLine.postActivity(activity).subscribe(function (id) {
+                    console.log('initial activity: id = ', id);
+                  });
+                } else if (params['enableOnConnected'] === 'true') {
+                  directLine
+                    .postActivity({ type: 'message', text: '', from: user })
+                    .subscribe(function (id) {
+                      console.log('empty activity: id = ', id);
+                    });
+                }
+              }
+              break;
+            case ConnectionStatus.ExpiredToken:
+              if (params['entryPoint'] !== undefined) {
+                let tokensUri = getTokensUri(params['entryPoint']);
+                $.getJSON(tokensUri)
+                  .done(function (token) {
+                    directLine.reconnect({
+                      token: token,
+                      streamUrl: directLine.streamUrl,
+                    });
+                  })
+                  .fail(function () {
+                    console.error('Could not get token');
+                    deferred.resolve({});
+                  });
+              }
+              break;
+          }
+        });
+
+        // the following custom events demonstrate how to pass routing data to Xperience interaction initialization
+        // https://docs.microsoft.com/en-us/bot-framework/nodejs/bot-builder-nodejs-backchannel
+        directLine.activity$
+          .filter(function (activity) {
+            return activity.type === 'event';
+          })
+          .subscribe(function (activity) {
+            if (activity.name === 'serverInteractionDataRequest') {
+              // value = { "entryPoint": "aa6edc2a-f501-f84a-6528-ee5a5eca72ff", "agentName": "agent0", "directoryName": "directory0", "contactProfileUniqueId": "uniqueId0", "attributes": [{"name":"attribute0","value":"value0"}], "priority": 1, "handicap": 0, "skillProfileName": "skillProfile0", "skills": [{"name":"skillName0","level":7,"weight":0.2}] };
+              let value = {};
+              if (params['entryPoint'] !== undefined) {
+                value.entryPoint = params['entryPoint'];
+              }
+              if (params['agentName'] !== undefined) {
+                value.agentName = params['agentName'];
+              }
+              if (params['directoryName'] !== undefined) {
+                value.directoryName = params['directoryName'];
+              }
+              if (params['contactProfileUniqueId'] !== undefined) {
+                value.contactProfileUniqueId = params['contactProfileUniqueId'];
+              }
+              if (params['attributes'] !== undefined) {
+                value.attributes = JSON.parse(params['attributes']);
+              }
+              if (params['priority'] !== undefined) {
+                value.priority = params['priority'];
+              }
+              if (params['handicap'] !== undefined) {
+                value.handicap = params['handicap'];
+              }
+              if (params['skillProfileName'] !== undefined) {
+                value.skillProfileName = params['skillProfileName'];
+              }
+              if (params['skills'] !== undefined) {
+                value.skills = JSON.parse(params['skills']);
+              }
+              if (params['email'] !== undefined) {
+                value.attributes = value.attributes || [];
+                value.attributes.push({
+                  name: 'email',
+                  value: params['email'],
+                });
+              }
+              if (channelAccountId !== undefined) {
+                value.attributes = value.attributes || [];
+                value.attributes.push({
+                  name: 'channelAccountId',
+                  value: params['channelAccountId'],
+                });
+              }
+              if (channelAccountName !== undefined) {
+                value.attributes = value.attributes || [];
+                value.attributes.push({
+                  name: 'channelAccountName',
+                  value: params['channelAccountName'],
+                });
+              }
+              if (params['origin'] !== undefined) {
+                value.attributes = value.attributes || [];
+                value.attributes.push({
+                  name: 'origin',
+                  value: params['origin'],
+                });
+              }
+              directLine
+                .postActivity({
+                  type: 'event',
+                  name: 'serverInteractionDataResponse',
+                  from: user,
+                  value: value,
+                })
+                .subscribe(function (id) {
+                  console.log('serverInteractionDataResponse id = ', id);
+                });
+            } else if (activity.name === 'agentConversationAddedEvent') {
+              if (params['enableOnConnected'] === 'true') {
+                enableWebChat();
+              }
+
+              if (
+                params['postActivityToAgent'] !== undefined &&
+                !postActivityToAgentProcessed
+              ) {
+                postActivityToAgentProcessed = true;
+                directLine
+                  .postActivity({
+                    type: 'event',
+                    name: 'postActivityToAgent',
+                    from: user,
+                    value: JSON.parse(params['postActivityToAgent']),
+                  })
+                  .subscribe(function (id) {
+                    console.log('postActivityToAgent id = ', id);
+                  });
+              }
+            } else if (activity.name === 'interactionEndedEvent') {
+              if (params['disableOnEnd'] === 'true') {
+                disableWebChat();
+                directLine.end();
+              }
+            }
+          });
+
+        renderWebChat();
+      });
+
+      function PostVidyoToAgent() {
+        console.debug('DEBUG-RAUL - vidyo');
+        console.log('email = ', document.getElementById('email100').value);
+        if (document.getElementById('email100').value != 'undefined') {
+          var uri =
+            'https://smartlivedemo.altitude.com/VidyoConnector/VidyoConnector.html?autoJoin=1&chatType=0&connectorType=browser&displayName=' +
+            document.getElementById('email100').value +
+            '&hideConfig=0&portal=enghousedev.platform.vidyo.io&roomKey=9OWQ8YGeEA&roomPin=1357911&userType=2';
+          document.getElementById('fvidyo').src = uri;
+        }
+        directLine
+          .postActivity({
+            type: 'message',
+            text: 'Enghouse Altitude Chat & Vidyo',
+            from: user,
+          })
+          .subscribe(function (id) {
+            console.log('empty activity: id = ', id);
+          });
+        directLine
+          .postActivity({
+            type: 'event',
+            name: 'OpenVidyo',
+            from: user,
+            value: true,
+          })
+          .subscribe(function (id) {
+            console.log('vidyo id = ', id);
+          });
+      }
+    </script>
+  </body>
 </html>
