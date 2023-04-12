@@ -61,8 +61,6 @@
           <span id="meetingLink"></span>
         </div>
         <div id="renderer"></div>
-        <!-- Div do chat -->
-        <div id="webchat" role="main"></div>
       </div>
 
       <div id="loadingPopUp" class="loading-popup" data-text="">
@@ -76,6 +74,10 @@
           </button>
         </div>
       </div>
+      <!-- ******************* -->
+      <!-- Div do chat -->
+      <div id="webchat" role="main" class="chat-popup"></div>
+      <!-- ******************* -->
     </main>
 
     <script src="main.js"></script>
@@ -83,7 +85,7 @@
       src="https://static.platform.vidyo.io/vidyoclient/webrtc/latest/VidyoClient.js"
       onload="onVidyoClientLoaded()"
     ></script>
-    //codigo do chat
+    <!--codigo do chat-->
     <script src="https://cdn.botframework.com/botframework-webchat/4.7.1/webchat-es5.js"></script>
     <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
     <script>
@@ -525,15 +527,6 @@
 
       async function PostVidyoToAgent() {
         console.debug('DEBUG-RAUL - vidyo');
-        directLine
-          .postActivity({
-            type: 'message',
-            text: 'Enghouse Altitude Chat & Vidyo',
-            from: user,
-          })
-          .subscribe(function (id) {
-            console.log('empty activity: id = ', id);
-          });
         directLine
           .postActivity({
             type: 'event',
